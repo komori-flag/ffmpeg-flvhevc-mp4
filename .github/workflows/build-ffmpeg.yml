@@ -140,7 +140,7 @@ jobs:
 
       - name: 编译
         working-directory: src
-        run: make -j$(nproc)
+        run: make -j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)
 
       - name: 验证
         working-directory: src
@@ -202,7 +202,7 @@ jobs:
 
       - name: 编译
         working-directory: /src
-        run: make -j$(nproc)
+        run: make -j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)
 
       - name: 验证
         working-directory: /src
