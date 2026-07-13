@@ -107,7 +107,7 @@ jobs:
             cross-prefix: ""
             pkgs: ""
             ext: ""
-            cc-opts: --extra-cflags="-arch x86_64" --extra-ldflags="-arch x86_64" --disable-inline-asm
+            cc-opts: --extra-cflags="-arch x86_64" --extra-ldflags="-arch x86_64" --disable-asm
 
     runs-on: ${{ matrix.os }}
 
