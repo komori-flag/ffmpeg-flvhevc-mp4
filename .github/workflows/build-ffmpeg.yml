@@ -1,0 +1,218 @@
+# Build FFmpeg Minimal — Multi-Platform
+#
+# FLV HEVC (CodecID 12) → MP4 转封装专用，跨所有主流平台
+# 仅编译最小化的 stream-copy 版本（无解码器/编码器/滤镜）
+#
+# 产物:
+#   ffmpeg-flvhevc-mp4-win-x86_64.exe     → Windows (x86_64)
+#   ffmpeg-flvhevc-mp4-linux-x86_64       → Linux glibc (x86_64)
+#   ffmpeg-flvhevc-mp4-linux-aarch64      → Linux glibc (ARM64)
+#   ffmpeg-flvhevc-mp4-linux-x86_64-musl  → Linux musl 全静态 (x86_64)
+#   ffmpeg-flvhevc-mp4-macos-arm64        → macOS Apple Silicon
+#   ffmpeg-flvhevc-mp4-macos-x86_64       → macOS Intel
+#
+# 使用:  ffmpeg -i input.flv -c copy output.mp4
+
+name: Build FFmpeg Minimal (FLV HEVC → MP4)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ffmpeg_ref:
+        description: 'FFmpeg 分支/标签'
+        default: master
+        type: string
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-ffmpeg.yml']
+
+env:
+  COMMON_CONFIG: >
+    --disable-everything
+    --enable-ffmpeg
+    --disable-ffprobe
+    --disable-ffplay
+    --enable-avcodec
+    --enable-avformat
+    --enable-avutil
+    --enable-demuxer=flv
+    --enable-muxer=mp4
+    --enable-parser=hevc
+    --enable-parser=aac
+    --enable-protocol=file
+    --enable-bsf=hevc_mp4toannexb
+    --enable-bsf=aac_adtstoasc
+    --enable-small
+    --disable-swscale
+    --disable-swresample
+    --disable-decoders
+    --disable-encoders
+    --disable-devices
+    --disable-filters
+    --disable-doc
+
+jobs:
+  ##############################################################################
+  # Windows / Linux (glibc) / macOS — 每个 runner 独立编译
+  ##############################################################################
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+
+          - name: win-x86_64
+            os: ubuntu-24.04
+            target-os: mingw32
+            arch: x86_64
+            cross-prefix: x86_64-w64-mingw32-
+            pkgs: mingw-w64 mingw-w64-tools
+            ext: .exe
+
+          - name: linux-x86_64
+            os: ubuntu-24.04
+            target-os: linux
+            arch: x86_64
+            cross-prefix: ""
+            pkgs: ""
+            ext: ""
+
+          - name: linux-aarch64
+            os: ubuntu-24.04
+            target-os: linux
+            arch: aarch64
+            cross-prefix: aarch64-linux-gnu-
+            pkgs: gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+            ext: ""
+
+          - name: macos-arm64
+            os: macos-latest
+            target-os: darwin
+            arch: arm64
+            cross-prefix: ""
+            pkgs: ""
+            ext: ""
+
+          - name: macos-x86_64
+            os: macos-13
+            target-os: darwin
+            arch: x86_64
+            cross-prefix: ""
+            pkgs: ""
+            ext: ""
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: 安装系统依赖 (仅 Linux cross)
+        if: runner.os == 'Linux' && matrix.pkgs != ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ${{ matrix.pkgs }}
+
+      - name: 检出 FFmpeg (${{ inputs.ffmpeg_ref || 'master' }})
+        uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          ref: ${{ inputs.ffmpeg_ref || 'master' }}
+          path: src
+
+      - name: 配置
+        working-directory: src
+        run: |
+          OPTS=""
+          [ -n "${{ matrix.cross-prefix }}" ] && OPTS="$OPTS --cross-prefix=${{ matrix.cross-prefix }}"
+          [ "${{ runner.os }}" = "macOS" ] && OPTS="$OPTS --cc=clang"
+          ./configure \
+            $OPTS \
+            --target-os=${{ matrix.target-os }} \
+            --arch=${{ matrix.arch }} \
+            ${{ env.COMMON_CONFIG }}
+
+      - name: 编译
+        working-directory: src
+        run: make -j$(nproc)
+
+      - name: 验证
+        working-directory: src
+        run: |
+          ls -lh ffmpeg${{ matrix.ext }}
+          file ffmpeg${{ matrix.ext }}
+
+      - name: 重命名产物
+        working-directory: src
+        run: |
+          OUT="ffmpeg-flvhevc-mp4-${{ matrix.name }}${{ matrix.ext }}"
+          cp ffmpeg${{ matrix.ext }} "$OUT"
+          echo "OUT_FILE=$OUT" >> $GITHUB_ENV
+
+      - name: 打包上传
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-flvhevc-mp4-${{ matrix.name }}
+          path: src/${{ env.OUT_FILE }}
+          compression-level: 9
+
+  ##############################################################################
+  # Linux x86_64 musl — Alpine 容器内编译，全静态链接
+  ##############################################################################
+  build-musl:
+    name: linux-x86_64-musl
+    runs-on: ubuntu-24.04
+    container:
+      image: alpine:latest
+
+    steps:
+      - name: 安装 Alpine 编译工具
+        run: |
+          apk add --no-cache \
+            build-base \
+            gcc \
+            musl-dev \
+            make \
+            git
+
+      - name: 检出 FFmpeg (${{ inputs.ffmpeg_ref || 'master' }})
+        working-directory: /
+        run: |
+          git clone --depth 1 \
+            https://github.com/FFmpeg/FFmpeg.git \
+            -b ${{ inputs.ffmpeg_ref || 'master' }} \
+            /src
+
+      - name: 配置 (musl 全静态)
+        working-directory: /src
+        run: |
+          ./configure \
+            --target-os=linux \
+            --arch=x86_64 \
+            --enable-static \
+            --disable-shared \
+            --extra-ldflags="-static" \
+            ${{ env.COMMON_CONFIG }}
+
+      - name: 编译
+        working-directory: /src
+        run: make -j$(nproc)
+
+      - name: 验证
+        working-directory: /src
+        run: |
+          ls -lh ffmpeg
+          file ffmpeg
+          ldd ffmpeg 2>&1 && echo "WARN: dynamic" || echo "OK: static"
+
+      - name: 重命名产物
+        working-directory: /src
+        run: |
+          OUT="ffmpeg-flvhevc-mp4-linux-x86_64-musl"
+          cp ffmpeg "$OUT"
+          echo "OUT_FILE=$OUT" >> $GITHUB_ENV
+
+      - name: 打包上传
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-flvhevc-mp4-linux-x86_64-musl
+          path: /src/${{ env.OUT_FILE }}
+          compression-level: 9
