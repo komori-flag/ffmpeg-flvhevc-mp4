@@ -22,6 +22,11 @@ on:
         description: 'FFmpeg 分支/标签'
         default: master
         type: string
+      create_release:
+        description: '构建完成后自动创建 Release'
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
     paths: ['.github/workflows/build-ffmpeg.yml']
@@ -217,3 +222,74 @@ jobs:
           name: ffmpeg-flvhevc-mp4-linux-x86_64-musl
           path: /src/${{ env.OUT_FILE }}
           compression-level: 9
+
+  ##############################################################################
+  # Release — 收集所有产物，创建 GitHub Release
+  ##############################################################################
+  release:
+    if: inputs.create_release == true
+    needs: [build, build-musl]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+
+      - name: 创建 Release
+        run: |
+          set -e
+          # 生成标签名
+          TAG_NAME="build-$(date +'%Y%m%d-%H%M')"
+
+          # 收集所有二进制文件
+          mkdir -p release
+          find artifacts -type f -name "ffmpeg-flvhevc-mp4-*" -exec cp {} release/ \;
+
+          # 生成 Release 说明
+          cat > release/RELEASE_NOTES.md <<'EOF'
+          # FFmpeg — FLV HEVC (CodecID 12) → MP4
+
+          本次构建包含以下平台的二进制:
+
+          | 文件 | 平台 |
+          |---|---|
+          EOF
+
+          for f in release/ffmpeg-flvhevc-mp4-*; do
+            name=$(basename "$f")
+            size=$(ls -lh "$f" | awk '{print $5}')
+            platform=""
+            case "$name" in
+              *win-x86_64*)     platform="Windows x86_64" ;;
+              *linux-x86_64-musl*) platform="Linux x86_64 (musl 全静态)" ;;
+              *linux-x86_64*)   platform="Linux x86_64 (glibc)" ;;
+              *linux-aarch64*)  platform="Linux aarch64 (ARM64)" ;;
+              *macos-arm64*)    platform="macOS Apple Silicon" ;;
+              *macos-x86_64*)   platform="macOS Intel" ;;
+              *)                platform="其他" ;;
+            esac
+            echo "| \`$name\` ($size) | $platform |" >> release/RELEASE_NOTES.md
+          done
+
+          cat >> release/RELEASE_NOTES.md <<'EOF'
+
+          **使用:**
+          ```bash
+          ffmpeg -i input.flv -c copy output.mp4
+          ```
+          EOF
+
+          # 创建 Release
+          gh release create "$TAG_NAME" \
+            --title "FFmpeg FLV HEVC → MP4 ($TAG_NAME)" \
+            --notes-file release/RELEASE_NOTES.md \
+            release/ffmpeg-flvhevc-mp4-*
+
+          echo "✅ Release created: $TAG_NAME"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
