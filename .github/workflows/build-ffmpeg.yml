@@ -101,12 +101,13 @@ jobs:
             ext: ""
 
           - name: macos-x86_64
-            os: macos-13
+            os: macos-latest
             target-os: darwin
             arch: x86_64
             cross-prefix: ""
             pkgs: ""
             ext: ""
+            cc-opts: --extra-cflags="-arch x86_64" --extra-ldflags="-arch x86_64"
 
     runs-on: ${{ matrix.os }}
 
@@ -130,6 +131,7 @@ jobs:
           OPTS=""
           [ -n "${{ matrix.cross-prefix }}" ] && OPTS="$OPTS --cross-prefix=${{ matrix.cross-prefix }}"
           [ "${{ runner.os }}" = "macOS" ] && OPTS="$OPTS --cc=clang"
+          [ -n "${{ matrix.cc-opts }}" ] && OPTS="$OPTS ${{ matrix.cc-opts }}"
           ./configure \
             $OPTS \
             --target-os=${{ matrix.target-os }} \
