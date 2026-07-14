@@ -107,7 +107,9 @@ jobs:
             cross-prefix: ""
             pkgs: ""
             ext: ""
-            cc-opts: --extra-cflags="-arch x86_64" --extra-ldflags="-arch x86_64" --disable-asm
+            extra-cflags: -arch x86_64
+            extra-ldflags: -arch x86_64
+            extra-conf: --disable-asm
 
     runs-on: ${{ matrix.os }}
 
@@ -131,7 +133,9 @@ jobs:
           OPTS=""
           [ -n "${{ matrix.cross-prefix }}" ] && OPTS="$OPTS --cross-prefix=${{ matrix.cross-prefix }}"
           [ "${{ runner.os }}" = "macOS" ] && OPTS="$OPTS --cc=clang"
-          [ -n "${{ matrix.cc-opts }}" ] && OPTS="$OPTS ${{ matrix.cc-opts }}"
+          [ -n "${{ matrix.extra-cflags }}" ] && OPTS="$OPTS --extra-cflags=${{ matrix.extra-cflags }}"
+          [ -n "${{ matrix.extra-ldflags }}" ] && OPTS="$OPTS --extra-ldflags=${{ matrix.extra-ldflags }}"
+          [ -n "${{ matrix.extra-conf }}" ] && OPTS="$OPTS ${{ matrix.extra-conf }}"
           ./configure \
             $OPTS \
             --target-os=${{ matrix.target-os }} \
