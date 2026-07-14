@@ -50,6 +50,12 @@ ffmpeg -i input.flv -c copy output.mp4
 
 此构建仅需 **FLV demuxer + MP4 muxer + parser + bitstream filter**，无需解码器参与，通过流复制（`-c copy`）完成转封装。
 
+## License
+
+本仓库中的构建脚本和配置文件采用 **GNU General Public License v3.0**。
+构建产出的 `ffmpeg.exe` / `ffprobe.exe` 基于 FFmpeg 源码编译，遵循 **GPL v2+**（因 fftools CLI 代码为 GPL）。
+使用或分发二进制时请遵守对应许可证条款。
+
 ---
 
 # FFmpeg README
