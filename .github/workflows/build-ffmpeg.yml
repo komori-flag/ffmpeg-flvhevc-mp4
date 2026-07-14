@@ -130,14 +130,14 @@ jobs:
       - name: 配置
         working-directory: src
         run: |
-          OPTS=""
-          [ -n "${{ matrix.cross-prefix }}" ] && OPTS="$OPTS --cross-prefix=${{ matrix.cross-prefix }}"
-          [ "${{ runner.os }}" = "macOS" ] && OPTS="$OPTS --cc=clang"
-          [ -n "${{ matrix.extra-cflags }}" ] && OPTS="$OPTS --extra-cflags=${{ matrix.extra-cflags }}"
-          [ -n "${{ matrix.extra-ldflags }}" ] && OPTS="$OPTS --extra-ldflags=${{ matrix.extra-ldflags }}"
-          [ -n "${{ matrix.extra-conf }}" ] && OPTS="$OPTS ${{ matrix.extra-conf }}"
+          CONFIG_OPTS=()
+          [ -n "${{ matrix.cross-prefix }}" ] && CONFIG_OPTS+=(--cross-prefix=${{ matrix.cross-prefix }})
+          [ "${{ runner.os }}" = "macOS" ] && CONFIG_OPTS+=(--cc=clang)
+          [ -n "${{ matrix.extra-cflags }}" ] && CONFIG_OPTS+=(--extra-cflags="${{ matrix.extra-cflags }}")
+          [ -n "${{ matrix.extra-ldflags }}" ] && CONFIG_OPTS+=(--extra-ldflags="${{ matrix.extra-ldflags }}")
+          [ -n "${{ matrix.extra-conf }}" ] && CONFIG_OPTS+=(${{ matrix.extra-conf }})
           ./configure \
-            $OPTS \
+            "${CONFIG_OPTS[@]}" \
             --target-os=${{ matrix.target-os }} \
             --arch=${{ matrix.arch }} \
             ${{ env.COMMON_CONFIG }}
