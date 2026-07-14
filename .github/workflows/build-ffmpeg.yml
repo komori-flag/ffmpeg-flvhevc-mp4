@@ -121,7 +121,7 @@ jobs:
           sudo apt-get install -y -qq nasm ${{ matrix.pkgs }}
 
       - name: 检出 FFmpeg (${{ inputs.ffmpeg_ref || 'master' }})
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: FFmpeg/FFmpeg
           ref: ${{ inputs.ffmpeg_ref || 'master' }}
@@ -160,7 +160,7 @@ jobs:
           echo "OUT_FILE=$OUT" >> $GITHUB_ENV
 
       - name: 打包上传
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ffmpeg-flvhevc-mp4-${{ matrix.name }}
           path: src/${{ env.OUT_FILE }}
@@ -223,7 +223,7 @@ jobs:
           echo "OUT_FILE=$OUT" >> $GITHUB_ENV
 
       - name: 打包上传
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ffmpeg-flvhevc-mp4-linux-x86_64-musl
           path: /src/${{ env.OUT_FILE }}
@@ -241,7 +241,7 @@ jobs:
 
     steps:
       - name: 下载所有构建产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
           merge-multiple: false
